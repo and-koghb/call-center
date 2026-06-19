@@ -19,6 +19,8 @@ For my code review and answers to the assignment questions, see [CODE_REVIEW.md]
 
 ## 1. Installation and Setup
 
+> For installation with Docker please see the bottom part of instructions.
+
 Run the following commands in order:
 
 ```bash
@@ -122,6 +124,70 @@ A high-load call distribution service for routing incoming calls to operators wa
 2. **Reliability and data consistency:** Thanks to transactions and `lockForUpdate()`, one operator can never physically receive two calls at the same time, even if they arrive in the same millisecond.
 3. **Clean code and fast tests:** The written tests are fully isolated from DB infrastructure dependencies using mocks (`Mockery`), run in hundredths of a second, and guarantee that queue and call status logic works strictly according to business requirements.
 
+## Docker
+
+Runs PHP 8.2-FPM, Nginx, MySQL 8.0, Redis 7, and two queue workers (`calls` + `default`).
+
+**Prerequisites:** Docker Engine 20+ and Docker Compose v2.
+
+```bash
+cd call-center
+
+# Use Docker-specific env (hostnames: mysql, redis)
+cp .env.docker.example .env
+
+# Build and start all services
+docker compose up -d --build
+
+# Install PHP dependencies (vendor/ is not in git)
+docker compose exec app composer install
+
+# Bootstrap the app
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan operators:redis-sync-operators
+
+# Restart workers after vendor/ and APP_KEY exist
+docker compose restart queue-calls queue-default
+```
+
+App: http://localhost:8080
+
+**Verify:**
+
+```bash
+# HTTP
+curl -I http://localhost:8080
+
+# DB + Redis
+docker compose exec app php artisan tinker --execute="DB::connection()->getPdo(); echo \Illuminate\Support\Facades\Redis::ping();"
+
+# Tests
+docker compose exec app php artisan test
+
+# Queue smoke test (watch queue-calls logs)
+docker compose exec app php artisan tinker --execute="app(\App\Services\CallService::class)->registerIncomingCall('+79991112233');"
+docker compose logs queue-calls --tail=20
+```
+
+**Useful commands:**
+
+```bash
+# start all services (after reboot or docker compose down)
+docker compose up -d
+# show status of all containers
+docker compose ps
+# follow logs from app and queue-calls services
+docker compose logs -f app queue-calls
+docker compose exec app php artisan migrate:fresh --seed
+# stop containers
+docker compose down
+# stop + delete DB/Redis volumes
+docker compose down -v
+```
+
+---
+
 ----------
 Russian version
 ----------
@@ -144,6 +210,8 @@ Russian version
 ---
 
 ## 1. Установка и запуск проекта
+
+> Для установки через Docker смотрите раздел в конце инструкции.
 
 Выполните последовательно следующие команды в терминале:
 
@@ -245,3 +313,65 @@ php artisan test --filter=IncomingCallTest
 1. **Высокая производительность (Scalability):** База данных MySQL полностью разгружена от постоянных поисков свободных людей. Redis выдерживает десятки тысяч запросов в секунду, обеспечивая моментальный отклик распределения.
 2. **Надежность и консистентность данных:** Благодаря транзакции и `lockForUpdate()`, один оператор физически никогда не получит два звонка одновременно, даже если они поступят в одну и ту же миллисекунду.
 3. **Чистота кода и скорость тестов:** Написанные тесты полностью изолированы от инфраструктурных зависаний СУБД с помощью моков (`Mockery`)
+
+## Docker
+
+Запускает PHP 8.2-FPM, Nginx, MySQL 8.0, Redis 7 и два воркера очередей (`calls` + `default`).
+
+**Требования:** Docker Engine 20+ и Docker Compose v2.
+
+```bash
+cd call-center
+
+# Используйте env-файл для Docker (хосты: mysql, redis)
+cp .env.docker.example .env
+
+# Сборка и запуск всех сервисов
+docker compose up -d --build
+
+# Установка PHP-зависимостей (vendor/ не в git)
+docker compose exec app composer install
+
+# Первичная настройка приложения
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan operators:redis-sync-operators
+
+# Перезапуск воркеров после появления vendor/ и APP_KEY
+docker compose restart queue-calls queue-default
+```
+
+Приложение: http://localhost:8080
+
+**Проверка:**
+
+```bash
+# HTTP
+curl -I http://localhost:8080
+
+# БД + Redis
+docker compose exec app php artisan tinker --execute="DB::connection()->getPdo(); echo \Illuminate\Support\Facades\Redis::ping();"
+
+# Тесты
+docker compose exec app php artisan test
+
+# Smoke-тест очереди (смотрите логи queue-calls)
+docker compose exec app php artisan tinker --execute="app(\App\Services\CallService::class)->registerIncomingCall('+37499112233');"
+docker compose logs queue-calls --tail=20
+```
+
+**Полезные команды:**
+
+```bash
+# запустить все сервисы (после перезагрузки или docker compose down)
+docker compose up -d
+# показать статус всех контейнеров
+docker compose ps
+# следить за логами сервисов app и queue-calls
+docker compose logs -f app queue-calls
+docker compose exec app php artisan migrate:fresh --seed
+# остановить контейнеры
+docker compose down
+# остановить и удалить тома БД/Redis
+docker compose down -v
+```

@@ -18,7 +18,7 @@ class OperatorRepository
     public function tryLockAndBindBusy(int $operatorId): ?Operator
     {
         return DB::transaction(function () use ($operatorId) {
-            $operator = Operator::withoutGlobalScopes()->where('id', $operatorId)
+            $operator = Operator::where('id', $operatorId)
                 ->where('status', OperatorStatus::AVAILABLE)
                 ->lockForUpdate()
                 ->first();

@@ -8,16 +8,26 @@ use Illuminate\Database\Eloquent\Model;
 
 trait HighLoadSoftDeletes
 {
-    use SoftDeletes;
+    use SoftDeletes {
+        bootSoftDeletes as private traitBootSoftDeletes;
+    }
 
     public static string $liveTimestamp = '1970-01-02 00:00:00';
 
-    protected static function bootHighLoadSoftDeletes()
+    public static function bootSoftDeletes(): void
     {
-        static::addGlobalScope(new class extends \Illuminate\Database\Eloquent\SoftDeletingScope {
-            public function apply(Builder $builder, Model $model)
+    }
+
+    protected static function bootHighLoadSoftDeletes(): void
+    {
+        static::addGlobalScope('highLoadSoftDeletes', new class implements \Illuminate\Database\Eloquent\Scope {
+            public function apply(Builder $builder, Model $model): void
             {
-                $builder->where($model->getQualifiedDeletedAtColumn(), '=', forward_static_call([get_class($model), 'getLiveTimestamp']));
+                $builder->where(
+                    $model->getQualifiedDeletedAtColumn(),
+                    '=',
+                    forward_static_call([get_class($model), 'getLiveTimestamp'])
+                );
             }
         });
     }
