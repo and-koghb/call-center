@@ -3,7 +3,10 @@
 (Русская версия - внизу)
 
 A Laravel 11 microservice for high-load distribution of incoming calls to operators using MySQL and Redis.
+
 See [TASK.md](TASK.md) for the full assignment description.
+
+For my code review and answers to the assignment questions, see [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 
@@ -123,7 +126,10 @@ Russian version
 # Система распределения звонков (Call Center Queue) - Тестовая задача
 
 Микросервис на Laravel 11 для высоконагруженного (Highload) распределения входящих звонков по операторам с использованием MySQL и Redis.
+
 Для чтения задачи посмотрите файл [TASK.md](TASK.md).
+
+Для код ревью с моей стороны и моих ответов на вопросы посмотрите файл [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ---
 
