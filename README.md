@@ -1,66 +1,235 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# Call Distribution System (Call Center Queue) — Test Assignment
+(Русская версия - внизу)
 
-## About Laravel
+A Laravel 11 microservice for high-load distribution of incoming calls to operators using MySQL and Redis.
+See [TASK.md](TASK.md) for the full assignment description.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
+* PHP >= 8.2
+* MySQL >= 8.0
+* Redis >= 6.0
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 1. Installation and Setup
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Run the following commands in order:
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+# Clone the repository and enter the project directory
+git clone https://github.com/and-koghb/call-center
+cd call-center
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# Install dependencies
+composer install
 
-## Laravel Sponsors
+# Create the environment configuration file
+cp .env.example .env
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# Generate the application key
+php artisan key:generate
 
-### Premium Partners
+# Create tables and seed with sample data
+php artisan migrate
+php artisan db:seed
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+> Open the created `.env` file and configure your database connection (`DB_*`) and Redis server (`REDIS_*`).
 
-## Contributing
+## 2. Running in Production/Development Mode
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Call distribution requires queue workers to continuously process jobs.
 
-## Code of Conduct
+```bash
+# In one terminal (or under Supervisor) for calls:
+php artisan queue:work --queue=calls
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# In another terminal for everything else:
+php artisan queue:work --queue=default
 
-## Security Vulnerabilities
+# Start the local development server (for web UI or API)
+# if you don't want to set up a virtual host
+php artisan serve
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## 3. Distribution Architecture and Configuration
 
-## License
+### `.env` settings for high-load mode:
+```ini
+# Required for async workers via Redis
+QUEUE_CONNECTION=redis
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Redis connection settings
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+
+### System components:
+* **Queue:** Laravel Jobs (`ProcessIncomingCallJob`) on a dedicated `calls` queue with a dynamic operator wait timeout (max 1 minute).
+* **Operator sync:** Console command `php artisan operators:redis-sync-operators` (class `SyncAvailableOperators`). Handles **initial setup** and keeps the list of active operators in Redis (Sorted Set) in sync with MySQL. Recommended to add to Laravel Scheduler (`routes/console.php`) for periodic runs.
+* **Redis:** Uses a Sorted Set (`ZADD` / `ZPOPMIN`) to instantly pick the most available operator without loading MySQL.
+* **MySQL:** Pessimistic locking (`SELECT ... FOR UPDATE`) in `tryLockAndBindBusy` to prevent race conditions when two calls try to grab the same operator at once.
+
+## 4. Testing (PHPUnit)
+The project uses isolated testing that does not touch the main (production) database or Redis pools.
+
+### Test setup (one-time):
+1. Create a separate empty database for tests (e.g. `call_center_testing`).
+2. Copy the test config: `cp .env.example .env.testing`.
+3. In `.env.testing`, set:
+   * `DB_DATABASE=call_center_testing`
+   * `REDIS_TEST_DB` (so tests only clear isolated Redis DB #1, not production).
+
+### Running tests:
+
+```bash
+# Run all tests
+php artisan test
+
+# Run only call distribution tests
+php artisan test --filter=IncomingCallTest
+```
+
+## 5. Solution Overview and Architectural Benefits
+
+### What was done
+
+First, I want to note that the task states the Job should find the client by phone number. However, I believe looking up the client by phone in `CallService` rather than in the Job is preferable, because it allows the call to be linked to the client immediately and captures the data state at the moment of the event. An additional benefit is reducing the number of DB queries from queue workers. That said, the performance gain from a single indexed lookup is usually modest and only becomes noticeable at sufficiently high load.
+
+A high-load call distribution service (`CallService`) was developed and optimized, working with Laravel queues, Redis, and MySQL. Fault-tolerant business logic and architectural Feature tests on PHPUnit were written, covering scenarios: successful call, no available operators, and soft delete.
+
+### Why it was done this way
+
+* **Hybrid approach (Redis + MySQL):** Instead of heavy and frequent `SELECT` queries to the relational database, the current list of available operators is stored in Redis memory as a **Sorted Set** (a data structure where operators are sorted by the time they were last freed).
+* **Atomicity via `ZPOPMIN`:** Extracting an operator from Redis happens in a single atomic operation. This guarantees the system instantly picks the operator who has been waiting the longest.
+* **Race condition protection (`FOR UPDATE`):** To prevent a situation where two parallel calls try to grab the same operator at once, pessimistic row locking is applied at the DB level in the MySQL repository: `SELECT ... FOR UPDATE`.
+* **Dynamic queue hold (`release(5)`):** If there are no available operators at the moment of the call, the job does not fail with an error but is softly returned to the Redis queue (`calls`) with a 5-second delay. The cycle repeats for up to one minute.
+
+### Why this solution is better than the standard approach
+
+1. **High performance (scalability):** MySQL is fully offloaded from constant searches for available operators. Redis handles tens of thousands of requests per second, providing instant distribution response.
+2. **Reliability and data consistency:** Thanks to transactions and `lockForUpdate()`, one operator can never physically receive two calls at the same time, even if they arrive in the same millisecond.
+3. **Clean code and fast tests:** The written tests are fully isolated from DB infrastructure dependencies using mocks (`Mockery`), run in hundredths of a second, and guarantee that queue and call status logic works strictly according to business requirements.
+
+----------
+Russian version
+----------
+
+# Система распределения звонков (Call Center Queue) - Тестовая задача
+
+Микросервис на Laravel 11 для высоконагруженного (Highload) распределения входящих звонков по операторам с использованием MySQL и Redis.
+Для чтения задачи посмотрите файл [TASK.md](TASK.md).
+
+---
+
+## Требования
+* PHP >= 8.2
+* MySQL >= 8.0
+* Redis >= 6.0
+
+---
+
+## 1. Установка и запуск проекта
+
+Выполните последовательно следующие команды в терминале:
+
+```bash
+# Клонирование репозитория и переход в папку проекта
+git clone https://github.com/and-koghb/call-center
+cd call-center
+
+# Установка зависимостей
+composer install
+
+# Создание файла конфигурации окружения
+cp .env.example .env
+
+# Генерация ключа приложения
+php artisan key:generate
+
+# Создание таблиц и наполнение вымышленными данными
+php artisan migrate
+php artisan db:seed
+```
+
+> Откройте созданный файл .env и настройте подключения к вашей основной базе данных (DB_*) и серверу Redis (REDIS_*).
+
+## 2. Запуск окружения в режиме Production/Development
+
+Для работы распределения звонков необходимо, чтобы воркеры очередей постоянно обрабатывали задачи.
+  
+```Bash
+# В одном терминале (или под управлением Supervisor) для звонков:
+php artisan queue:work --queue=calls
+
+# В другом терминале для всего остального:
+php artisan queue:work --queue=default
+
+# Запуск локального сервера (для веб-интерфейса или API)
+# если не хочеться создать виртуальный хост
+php artisan serve
+```
+
+## 3. Архитектура распределения и конфигурация
+
+### Настройки `.env` для Highload-режима:
+```ini
+# Ключевой параметр для работы асинхронных воркеров через Redis
+QUEUE_CONNECTION=redis
+
+# Настройки подключения к Redis
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+```
+
+### Компоненты системы:
+* **Очередь:** Laravel Jobs (`ProcessIncomingCallJob`) на выделенной очереди `calls` с динамическим таймаутом ожидания оператора (максимум 1 минута).
+* **Синхронизация операторов:** Консольная команда `php artisan operators:redis-sync-operators` (класс `SyncAvailableOperators`). Она отвечает за **первичную инициализацию** и актуализацию списка активных операторов в Redis (Sorted Set) на основе данных из MySQL. Рекомендуется добавлять её в Laravel Scheduler (`routes/console.php`) для периодического перезапуска.
+* **Redis:** Используется Sorted Set (`ZADD` / `ZPOPMIN`) для мгновенного получения самого свободного оператора без нагрузки на MySQL.
+* **MySQL:** Пессимистическая блокировка (`SELECT ... FOR UPDATE`) в методе `tryLockAndBindBusy` для защиты от Race Condition (ситуаций, когда два звонка пытаются одновременно захватить одного и того же оператора).
+
+## 4. Тестирование (PHPUnit)
+В проекте настроено изолированное тестирование, которое не затрагивает основную (рабочую) базу данных и продакшн-пулы Redis.
+   
+###Подготовка к тестам (выполняется один раз):
+1. Создайте отдельную пустую БД для тестов (например, call_center_testing).
+2. Скопируйте конфиг тестов: cp .env.example .env.testing.
+3. В файле .env.testing укажите параметры:
+   * DB_DATABASE=call_center_testing
+   * REDIS_TEST_DB (чтобы тесты очищали только изолированную базу №1 в Redis, не трогая прод).
+   
+### Команды запуска тестов:
+
+```bash
+# Запустить все тесты в проекте
+php artisan test
+
+# Запустить только тесты распределения звонков
+php artisan test --filter=IncomingCallTest
+```
+
+## 5. Описание решения и архитектурные преимущества
+
+### Что было сделано
+
+Во первых хочу сказать, что на таске говорится, что Job должен найти клиента по номеру телефона. Но я думаю, что искать клиента по телефону в CallService лучше, чем в Job, потому что это позволяет сразу связать звонок с клиентом и зафиксировать состояние данных на момент события. Дополнительным плюсом является уменьшение количества запросов к БД со стороны воркеров очереди. Однако выигрыш в производительности от одного индексного поиска сам по себе обычно невелик и становится заметным только при достаточно высокой нагрузке.
+
+Разработан высоконагруженный (Highload) сервис распределения входящих звонков по операторам, работающий в связке с очередями Laravel, Redis и MySQL. Написал коды по принцыпам SOLID, использовал репозитории и сервисы, добавил архитектурные Feature-тесты на PHPUnit, покрывающие сценарии успешный звонок, отсутствие операторов, мягкое удаление.
+
+### Почему сделано именно так:
+* **Гибридный подход (Redis + MySQL):** Вместо тяжелых и частых `SELECT`-запросов к реляционной базе данных, актуальный список свободных операторов хранится в оперативной памяти Redis в виде **Sorted Set** (структура данных, где операторы отсортированы по времени их последнего освобождения). 
+* **Атомарность через `ZPOPMIN`:** Извлечение оператора из Redis происходит за одну атомарную операцию. Это гарантирует, что система моментально забирает самого «заждавшегося» сотрудника.
+* **Защита от Race Condition (`FOR UPDATE`):** Чтобы исключить ситуацию, когда два параллельных звонка одновременно пытаются захватить одного и того же оператора, в MySQL-репозитории применена пессимистическая блокировка строк на уровне БД: `SELECT ... FOR UPDATE`.
+* **Динамическое удержание в очереди (`release(5)`):** Если в момент звонка свободных операторов нет, задача не падает с ошибкой, а мягко возвращается обратно в очередь Redis (`calls`) с задержкой в 5 секунд. Цикл повторяется в течение одной минуты.
+
+### Почему это решение лучше стандартного:
+1. **Высокая производительность (Scalability):** База данных MySQL полностью разгружена от постоянных поисков свободных людей. Redis выдерживает десятки тысяч запросов в секунду, обеспечивая моментальный отклик распределения.
+2. **Надежность и консистентность данных:** Благодаря транзакции и `lockForUpdate()`, один оператор физически никогда не получит два звонка одновременно, даже если они поступят в одну и ту же миллисекунду.
+3. **Чистота кода и скорость тестов:** Написанные тесты полностью изолированы от инфраструктурных зависаний СУБД с помощью моков (`Mockery`)

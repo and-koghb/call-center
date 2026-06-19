@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'asterisk' => [
+        'url' => env('ASTERISK_URL', 'http://127.0.0.1:8088/ari'),
+        'token' => env('ASTERISK_TOKEN'),
+        'timeout' => (int) env('ASTERISK_TIMEOUT', 3),
+    ],
+
 ];
