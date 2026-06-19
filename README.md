@@ -31,7 +31,12 @@ composer install
 
 # Create the environment configuration file
 cp .env.example .env
+```
 
+> Open the created `.env` file and configure your database connection (`DB_*`) and Redis server (`REDIS_*`).
+Only after that run the commands below.
+
+```bash
 # Generate the application key
 php artisan key:generate
 
@@ -39,8 +44,6 @@ php artisan key:generate
 php artisan migrate
 php artisan db:seed
 ```
-
-> Open the created `.env` file and configure your database connection (`DB_*`) and Redis server (`REDIS_*`).
 
 ## 2. Running in Production/Development Mode
 
@@ -154,7 +157,12 @@ composer install
 
 # Создание файла конфигурации окружения
 cp .env.example .env
+```
 
+> Откройте созданный файл .env и настройте подключения к вашей основной базе данных (DB_*) и серверу Redis (REDIS_*).
+Только после этого выполняйте команды ниже.
+
+```bash
 # Генерация ключа приложения
 php artisan key:generate
 
@@ -162,8 +170,6 @@ php artisan key:generate
 php artisan migrate
 php artisan db:seed
 ```
-
-> Откройте созданный файл .env и настройте подключения к вашей основной базе данных (DB_*) и серверу Redis (REDIS_*).
 
 ## 2. Запуск окружения в режиме Production/Development
 
