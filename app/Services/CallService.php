@@ -22,7 +22,7 @@ class CallService
 
     public function registerIncomingCall(string $phone): void
     {
-        $call = $this->callRepository->createRawIncoming($phone);
+        $call = $this->callRepository->createIncoming($phone);
 
         ProcessIncomingCallJob::dispatch($call->id)->onQueue('calls');
     }
