@@ -119,9 +119,9 @@ Cover:
 - what **simply adding more workers** will improve, and where it will **stop helping**;
 - limits that may appear in **Redis**, the **database**, **HTTP integration with telephony**, and **logging**.
 
----
-
----
+----------
+Russian version
+----------
 
 # Тестовое задание
 

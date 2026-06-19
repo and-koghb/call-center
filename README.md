@@ -101,7 +101,7 @@ php artisan test --filter=IncomingCallTest
 
 First, I want to note that the task states the Job should find the client by phone number. However, I believe looking up the client by phone in `CallService` rather than in the Job is preferable, because it allows the call to be linked to the client immediately and captures the data state at the moment of the event. An additional benefit is reducing the number of DB queries from queue workers. That said, the performance gain from a single indexed lookup is usually modest and only becomes noticeable at sufficiently high load.
 
-A high-load call distribution service (`CallService`) was developed and optimized, working with Laravel queues, Redis, and MySQL. Fault-tolerant business logic and architectural Feature tests on PHPUnit were written, covering scenarios: successful call, no available operators, and soft delete.
+A high-load call distribution service for routing incoming calls to operators was developed, integrated with Laravel queues, Redis, and MySQL. The code follows SOLID principles, using a contract, repositories, and services; customized soft delete is used for operators and clients. Added architectural Feature tests on PHPUnit covering scenarios: successful call, no available operators, and soft delete.
 
 ### Why it was done this way
 
@@ -221,7 +221,7 @@ php artisan test --filter=IncomingCallTest
 
 Во первых хочу сказать, что на таске говорится, что Job должен найти клиента по номеру телефона. Но я думаю, что искать клиента по телефону в CallService лучше, чем в Job, потому что это позволяет сразу связать звонок с клиентом и зафиксировать состояние данных на момент события. Дополнительным плюсом является уменьшение количества запросов к БД со стороны воркеров очереди. Однако выигрыш в производительности от одного индексного поиска сам по себе обычно невелик и становится заметным только при достаточно высокой нагрузке.
 
-Разработан высоконагруженный (Highload) сервис распределения входящих звонков по операторам, работающий в связке с очередями Laravel, Redis и MySQL. Написал коды по принцыпам SOLID, использовал репозитории и сервисы, добавил архитектурные Feature-тесты на PHPUnit, покрывающие сценарии успешный звонок, отсутствие операторов, мягкое удаление.
+Разработан высоконагруженный (Highload) сервис распределения входящих звонков по операторам, работающий в связке с очередями Laravel, Redis и MySQL. Написал коды по принцыпам SOLID, использовал контракт, репозитории и сервисы, для операторов и клиентов использовал кастомизированный софт делейт. Добавил архитектурные Feature-тесты на PHPUnit, покрывающие сценарии успешный звонок, отсутствие операторов, мягкое удаление.
 
 ### Почему сделано именно так:
 * **Гибридный подход (Redis + MySQL):** Вместо тяжелых и частых `SELECT`-запросов к реляционной базе данных, актуальный список свободных операторов хранится в оперативной памяти Redis в виде **Sorted Set** (структура данных, где операторы отсортированы по времени их последнего освобождения). 

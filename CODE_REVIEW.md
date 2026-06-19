@@ -48,7 +48,9 @@ Actually, right now it would be better not to overcomplicate the architecture �
 * Under heavy load we could end up with terabytes of logs.
 * In the extreme case, you can simply split the call center into parts and have separate servers for each.
 
----
+----------
+Russian version
+----------
 
 # Проверка кода
 
