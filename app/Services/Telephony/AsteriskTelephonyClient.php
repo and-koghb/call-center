@@ -11,7 +11,7 @@ class AsteriskTelephonyClient implements TelephonyClientInterface
 {
     public function sendCallAssigned(Call $call, int $operatorId): void
     {
-        $response = Http::timeout(3)
+        $response = Http::timeout((int) config('services.asterisk.timeout'))
             ->withToken(config('services.asterisk.token'))
             ->post(config('services.asterisk.url') . '/channels/bridge', [
                 'channel_id'  => $call->phone,
